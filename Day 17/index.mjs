@@ -79,7 +79,7 @@ class Grid {
         this.#height = Math.max(this.#height, y + 1);
     }
 
-    __hash(x, y) { return `${y * 10000 + x}`; }
+    __hash(x, y) { return y * 10000 + x; }
 }
 
 class Rock {
