@@ -67,6 +67,16 @@ class Grid {
     get width() { return this.#width; }
     get height() { return this.#height; }
 
+    calculateRowHash(y) {
+        let result = 0;
+        for (let x = 0; x < this.#width; ++x) {
+            if (!this.isAvailable(x, y))
+                result += Math.pow(2, x);
+        }
+
+        return result;
+    }
+
     isAvailable(x, y) {
         if (x < 0 || x >= this.#width || y < 0)
             return false;  // out of bounds
@@ -210,13 +220,44 @@ function printGrid(grid, rock, topLeftX, topLeftY) {
     console.log('');
 }
 
-for (const [ part, numberOfRocks ] of [[ 1, 2022 ], [ 2, 1000000000000 ]]) {
+function identifyRepeatingPatterns(grid) {
+    const hashes = [];
+    for (let y = 0; y < grid.height; ++y)
+        hashes.push(grid.calculateRowHash(y));
+
+    for (let windowSize = 2; windowSize < 5000; ++windowSize) {
+        for (let startY = 0; startY < windowSize; ++startY) {
+            if (startY + windowSize * 2 > hashes.length)
+                break;  // not enough data
+
+            let match = true;
+
+            for (let y = startY; y < startY + windowSize; ++y) {
+                if (hashes[y] === hashes[y + windowSize])
+                    continue;
+
+                match = false;
+                break;
+            }
+
+            if (match) {
+                console.log(`Found pattern w/ windowSize=${windowSize} at y=${startY}`);
+                break;
+            }
+        }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
+// part 1
+{
     const grid = new Grid(/* width= */ 7);
 
     const patternGenerator = new PatternGenerator(patternInput).generator();
     const rockGenerator = new RockGenerator().generator();
 
-    for (let iteration = 0; iteration < numberOfRocks; ++iteration) {
+    for (let iteration = 0; iteration < 2022; ++iteration) {
         const rock = rockGenerator.next().value;
 
         let topLeftX = /* two units away from the left wall= */ 2;
@@ -238,5 +279,48 @@ for (const [ part, numberOfRocks ] of [[ 1, 2022 ], [ 2, 1000000000000 ]]) {
         }
     }
 
-    console.log(`Part ${part}:`, grid.height);
+    console.log(`Part 1:`, grid.height);
+}
+
+// part 2
+{
+    const grid = new Grid(/* width= */ 7);
+
+    const patternGenerator = new PatternGenerator(patternInput).generator();
+    const rockGenerator = new RockGenerator().generator();
+
+    // (a) find a repeating window in the data
+    let windowOffset = null;
+    let window = null;
+
+
+
+
+    for (let iteration = 0; iteration < 1000000000000; ++iteration) {
+        const rock = rockGenerator.next().value;
+
+        let topLeftX = /* two units away from the left wall= */ 2;
+        let topLeftY = /* three units above the highest rock= */ grid.height + rock.size.height + 2;
+
+        while (true) {
+            // (a) being pushed by a jet of hot gas
+            const direction = patternGenerator.next().value;
+            if (rock.canMove(grid, { topLeftX, topLeftY }, direction))
+                topLeftX += kHorizontalOffset[direction];
+
+            // (b) falling one unit down
+            if (!rock.canMove(grid, { topLeftX, topLeftY }, kDown)) {
+                rock.settle(grid, { topLeftX, topLeftY });
+                break;
+            }
+
+            topLeftY -= 1;
+        }
+
+        if (iteration % 10000 === 0) {
+            identifyRepeatingPatterns(grid);
+        }
+    }
+
+    console.log(`Part 2:`, grid.height);
 }
