@@ -179,6 +179,37 @@ let patternInput = [];
 
 // -------------------------------------------------------------------------------------------------
 
+function isOccupiedByFallingRock(rock, x, y, topLeftX, topLeftY) {
+    if (x < topLeftX || x >= (topLeftX + rock.size.width))
+        return false;
+    if (y > topLeftY || y <= (topLeftY - rock.size.height))
+        return false;
+
+    return rock.shape[topLeftY - y][x - topLeftX] === '#';
+}
+
+function printGrid(grid, rock, topLeftX, topLeftY) {
+    console.log('+' + ('-'.repeat(grid.width)) + '+');
+
+    for (let y = grid.height + rock.size.height + 3; y >= 0; --y) {
+        const row = [];
+
+        for (let x = 0; x < grid.width; ++x) {
+            if (isOccupiedByFallingRock(rock, x, y, topLeftX, topLeftY))
+                row.push('@');
+            else if (!grid.isAvailable(x, y))
+                row.push('#');
+            else
+                row.push('.');
+        }
+
+        console.log([ '|', ...row, '|' ].join(''));
+    }
+
+    console.log('+' + ('-'.repeat(grid.width)) + '+');
+    console.log('');
+}
+
 for (const [ part, numberOfRocks ] of [[ 1, 2022 ], [ 2, 1000000000000 ]]) {
     const grid = new Grid(/* width= */ 7);
 
