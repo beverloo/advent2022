@@ -7,15 +7,15 @@ const kRight = /* > */ 62;
 const kDown = /* v */ 118;
 
 const kHorizontalOffset = {
-    [kLeft]: -1,
-    [kRight]: 1,
-    [kDown]: 0,
+    [kLeft]: -1n,
+    [kRight]: 1n,
+    [kDown]: 0n,
 };
 
 const kVerticalOffset = {
-    [kLeft]: 0,
-    [kRight]: 0,
-    [kDown]: -1,
+    [kLeft]: 0n,
+    [kRight]: 0n,
+    [kDown]: -1n,
 }
 
 const kRocks = [
@@ -61,7 +61,7 @@ class Grid {
         this.#occupied = new Set();
 
         this.#width = width;
-        this.#height = 0;
+        this.#height = 0n;
     }
 
     get width() { return this.#width; }
@@ -76,21 +76,26 @@ class Grid {
 
     settle(x, y) {
         this.#occupied.add(this.__hash(x, y));
-        this.#height = Math.max(this.#height, y + 1);
+
+        if (this.#height < y + 1n)
+            this.#height = y + 1n;
     }
 
-    __hash(x, y) { return y * 10000 + x; }
+    __hash(x, y) { return y * 10000n + x; }
 }
 
 class Rock {
     #shape;
     #size;
+    #type;
 
-    constructor(shape) {
+    constructor(type, shape) {
         this.#shape = shape.map(row => row.map(column => column === '#'));
+
+        this.#type = type;
         this.#size = {
-            width: shape[0].length,
-            height: shape.length,
+            width: BigInt(shape[0].length),
+            height: BigInt(shape.length),
         };
     }
 
@@ -106,8 +111,8 @@ class Rock {
             return true;
 
         // slow path:
-        for (let shapeX = 0; shapeX < this.#size.width; ++shapeX) {
-            for (let shapeY = 0; shapeY < this.#size.height; ++shapeY) {
+        for (let shapeX = 0n; shapeX < this.#size.width; ++shapeX) {
+            for (let shapeY = 0n; shapeY < this.#size.height; ++shapeY) {
                 if (!this.#shape[shapeY][shapeX])
                     continue;  // ignore void spaces
 
@@ -123,8 +128,8 @@ class Rock {
     }
 
     settle(grid, { topLeftX, topLeftY }) {
-        for (let shapeX = 0; shapeX < this.#size.width; ++shapeX) {
-            for (let shapeY = 0; shapeY < this.#size.height; ++shapeY) {
+        for (let shapeX = 0n; shapeX < this.#size.width; ++shapeX) {
+            for (let shapeY = 0n; shapeY < this.#size.height; ++shapeY) {
                 if (!this.#shape[shapeY][shapeX])
                     continue;  // ignore void spaces
 
@@ -141,6 +146,7 @@ class Rock {
 
     get shape() { return this.#shape; }
     get size() { return this.#size; }
+    get type() { return this.#type; }
 }
 
 class RockGenerator {
@@ -148,7 +154,7 @@ class RockGenerator {
     #offset;
 
     constructor() {
-        this.#types = kRocks.map(shape => new Rock(shape));
+        this.#types = kRocks.map((shape, i) => new Rock(i, shape));
         this.#offset = 0;
     }
 
@@ -157,6 +163,49 @@ class RockGenerator {
     *generator() {
         while (true)
             yield this.#types[this.#offset++ % this.#types.length];
+    }
+}
+
+class CycleDetector {
+    static kMinimumLength = 100;
+
+    #iterations;
+
+    #hashes = new Map();
+    #heights = new Map();
+
+    #cycleLength = 0;
+    #cycleCandidate = 0;
+
+    constructor(iterations) {
+        this.#iterations = BigInt(iterations);
+    }
+
+    detect(iteration, iterationHash, iterationHeight) {
+        if (this.#hashes.has(iterationHash)) {
+            const iterations = iteration - this.#hashes.get(iterationHash);
+            const height = iterationHeight - this.#heights.get(iterationHash);
+
+            if (!this.#cycleCandidate) {
+                this.#cycleCandidate = iterations;
+                this.#cycleLength = 1;
+            } else if (this.#cycleCandidate === iterations) {
+                this.#cycleLength++;
+            }
+
+            if (this.#cycleLength >= CycleDetector.kMinimumLength) {
+                const iterationRemainder = iteration % this.#cycleCandidate;
+                const maximumRemainder = (this.#iterations - 1n) % this.#cycleCandidate;
+
+                if (iterationRemainder === maximumRemainder)
+                    return ((this.#iterations - iteration) / this.#cycleCandidate) * height;
+            }
+        } else {
+            this.#cycleCandidate = 0;
+        }
+
+        this.#hashes.set(iterationHash, iteration);
+        this.#heights.set(iterationHash, iterationHeight);
     }
 }
 
@@ -181,7 +230,7 @@ let patternInput = [];
 
 // part 1
 {
-    const grid = new Grid(/* width= */ 7);
+    const grid = new Grid(/* width= */ 7n);
 
     const patternGenerator = new PatternGenerator(patternInput).generator();
     const rockGenerator = new RockGenerator().generator();
@@ -189,8 +238,8 @@ let patternInput = [];
     for (let iteration = 0; iteration < 2022; ++iteration) {
         const rock = rockGenerator.next().value;
 
-        let topLeftX = /* two units away from the left wall= */ 2;
-        let topLeftY = /* three units above the highest rock= */ grid.height + rock.size.height + 2;
+        let topLeftX = /* two units away from the left wall= */ 2n;
+        let topLeftY = /* three units above the highest rock= */ grid.height + rock.size.height + 2n;
 
         while (true) {
             // (a) being pushed by a jet of hot gas
@@ -204,7 +253,7 @@ let patternInput = [];
                 break;
             }
 
-            topLeftY -= 1;
+            topLeftY -= 1n;
         }
     }
 
@@ -213,35 +262,27 @@ let patternInput = [];
 
 // part 2
 {
-    // the first 248 rows are without a pattern
-    // the following 2160 rows are a pattern that infinitely repeats
-    // thus:
-    // - head)   160 rocks
-    // - middle) 589970501 * 1695 rocks
-    // - tail)   645 rocks
-    //
-    // identified through rather manual pattern recognition and maths
+    const grid = new Grid(/* width= */ 7n);
 
-    const grid = new Grid(/* width= */ 7);
-
+    const cycleDetector = new CycleDetector(1000000000000);
     const patternGenerator = new PatternGenerator(patternInput).generator();
     const rockGenerator = new RockGenerator().generator();
 
-    let head = null;
-    let middle = null;
-    let tail = null;
+    let movementPattern = 0n;
 
-    for (let iteration = 0; iteration < 160 + 1695 + 645; ++iteration) {
+    for (let iteration = 0n; iteration < 1000000000000; ++iteration) {
         const rock = rockGenerator.next().value;
 
-        let topLeftX = /* two units away from the left wall= */ 2;
-        let topLeftY = /* three units above the highest rock= */ grid.height + rock.size.height + 2;
+        let topLeftX = /* two units away from the left wall= */ 2n;
+        let topLeftY = /* three units above the highest rock= */ grid.height + rock.size.height + 2n;
 
         while (true) {
             // (a) being pushed by a jet of hot gas
             const direction = patternGenerator.next().value;
-            if (rock.canMove(grid, { topLeftX, topLeftY }, direction))
+            if (rock.canMove(grid, { topLeftX, topLeftY }, direction)) {
                 topLeftX += kHorizontalOffset[direction];
+                movementPattern++;
+            }
 
             // (b) falling one unit down
             if (!rock.canMove(grid, { topLeftX, topLeftY }, kDown)) {
@@ -249,25 +290,15 @@ let patternInput = [];
                 break;
             }
 
-            topLeftY -= 1;
+            topLeftY -= 1n;
+            movementPattern++;
         }
 
-        if (iteration < 160)
-            head = grid.height;
-        else if (iteration === 160 && head === grid.height)
-            throw new Error('Unexpectedly found the same grid height after rock 161');
-
-        if (iteration < 1855)
-            middle = grid.height;
-        else if (iteration === 1855 && middle === grid.height)
-            throw new Error('Unexpectedly found the same grid height after rock 1855');
+        const iterationHash = BigInt(rock.type) + (5n * (movementPattern % BigInt(patternInput.length)));
+        const result = cycleDetector.detect(iteration, iterationHash, grid.height);
+        if (result) {
+            console.log('Part 2:', grid.height + result);
+            break;
+        }
     }
-
-    const repetitions = Math.floor(1000000000000 / 1695);
-    const solution = head +
-                     (repetitions * middle) +
-                     (grid.height - middle);
-
-
-    console.log(`Part 2:`, solution);
 }
