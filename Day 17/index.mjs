@@ -67,16 +67,6 @@ class Grid {
     get width() { return this.#width; }
     get height() { return this.#height; }
 
-    calculateRowHash(y) {
-        let result = 0;
-        for (let x = 0; x < this.#width; ++x) {
-            if (!this.isAvailable(x, y))
-                result += Math.pow(2, x);
-        }
-
-        return result;
-    }
-
     isAvailable(x, y) {
         if (x < 0 || x >= this.#width || y < 0)
             return false;  // out of bounds
@@ -189,67 +179,6 @@ let patternInput = [];
 
 // -------------------------------------------------------------------------------------------------
 
-function isOccupiedByFallingRock(rock, x, y, topLeftX, topLeftY) {
-    if (x < topLeftX || x >= (topLeftX + rock.size.width))
-        return false;
-    if (y > topLeftY || y <= (topLeftY - rock.size.height))
-        return false;
-
-    return rock.shape[topLeftY - y][x - topLeftX] === '#';
-}
-
-function printGrid(grid, rock, topLeftX, topLeftY) {
-    console.log('+' + ('-'.repeat(grid.width)) + '+');
-
-    for (let y = grid.height + rock.size.height + 3; y >= 0; --y) {
-        const row = [];
-
-        for (let x = 0; x < grid.width; ++x) {
-            if (isOccupiedByFallingRock(rock, x, y, topLeftX, topLeftY))
-                row.push('@');
-            else if (!grid.isAvailable(x, y))
-                row.push('#');
-            else
-                row.push('.');
-        }
-
-        console.log([ '|', ...row, '|' ].join(''));
-    }
-
-    console.log('+' + ('-'.repeat(grid.width)) + '+');
-    console.log('');
-}
-
-function identifyRepeatingPatterns(grid) {
-    const hashes = [];
-    for (let y = 0; y < grid.height; ++y)
-        hashes.push(grid.calculateRowHash(y));
-
-    for (let windowSize = 2; windowSize < 5000; ++windowSize) {
-        for (let startY = 0; startY < windowSize; ++startY) {
-            if (startY + windowSize * 2 > hashes.length)
-                break;  // not enough data
-
-            let match = true;
-
-            for (let y = startY; y < startY + windowSize; ++y) {
-                if (hashes[y] === hashes[y + windowSize])
-                    continue;
-
-                match = false;
-                break;
-            }
-
-            if (match) {
-                console.log(`Found pattern w/ windowSize=${windowSize} at y=${startY}`);
-                break;
-            }
-        }
-    }
-}
-
-// -------------------------------------------------------------------------------------------------
-
 // part 1
 {
     const grid = new Grid(/* width= */ 7);
@@ -284,19 +213,25 @@ function identifyRepeatingPatterns(grid) {
 
 // part 2
 {
+    // the first 248 rows are without a pattern
+    // the following 2160 rows are a pattern that infinitely repeats
+    // thus:
+    // - head)   160 rocks
+    // - middle) 589970501 * 1695 rocks
+    // - tail)   645 rocks
+    //
+    // identified through rather manual pattern recognition and maths
+
     const grid = new Grid(/* width= */ 7);
 
     const patternGenerator = new PatternGenerator(patternInput).generator();
     const rockGenerator = new RockGenerator().generator();
 
-    // (a) find a repeating window in the data
-    let windowOffset = null;
-    let window = null;
+    let head = null;
+    let middle = null;
+    let tail = null;
 
-
-
-
-    for (let iteration = 0; iteration < 1000000000000; ++iteration) {
+    for (let iteration = 0; iteration < 160 + 1695 + 645; ++iteration) {
         const rock = rockGenerator.next().value;
 
         let topLeftX = /* two units away from the left wall= */ 2;
@@ -317,10 +252,22 @@ function identifyRepeatingPatterns(grid) {
             topLeftY -= 1;
         }
 
-        if (iteration % 10000 === 0) {
-            identifyRepeatingPatterns(grid);
-        }
+        if (iteration < 160)
+            head = grid.height;
+        else if (iteration === 160 && head === grid.height)
+            throw new Error('Unexpectedly found the same grid height after rock 161');
+
+        if (iteration < 1855)
+            middle = grid.height;
+        else if (iteration === 1855 && middle === grid.height)
+            throw new Error('Unexpectedly found the same grid height after rock 1855');
     }
 
-    console.log(`Part 2:`, grid.height);
+    const repetitions = Math.floor(1000000000000 / 1695);
+    const solution = head +
+                     (repetitions * middle) +
+                     (grid.height - middle);
+
+
+    console.log(`Part 2:`, solution);
 }
