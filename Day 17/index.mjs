@@ -2,9 +2,9 @@ import fs from 'fs/promises';
 
 // -------------------------------------------------------------------------------------------------
 
-const kLeft = '<';
-const kRight = '>';
-const kDown = 'v';
+const kLeft = /* < */ 60;
+const kRight = /* > */ 62;
+const kDown = /* v */ 118;
 
 const kHorizontalOffset = {
     [kLeft]: -1,
@@ -87,7 +87,7 @@ class Rock {
     #size;
 
     constructor(shape) {
-        this.#shape = shape;
+        this.#shape = shape.map(row => row.map(column => column === '#'));
         this.#size = {
             width: shape[0].length,
             height: shape.length,
@@ -95,9 +95,20 @@ class Rock {
     }
 
     canMove(grid, { topLeftX, topLeftY }, direction) {
+        // fast path:
+        if (direction === kLeft && topLeftX === 0)
+            return false;
+
+        if (direction === kRight && (topLeftX + this.#size.width) === grid.width)
+            return false;
+
+        if (direction === kDown && (topLeftY - this.#size.height) > grid.height)
+            return true;
+
+        // slow path:
         for (let shapeX = 0; shapeX < this.#size.width; ++shapeX) {
             for (let shapeY = 0; shapeY < this.#size.height; ++shapeY) {
-                if (this.#shape[shapeY][shapeX] !== '#')
+                if (!this.#shape[shapeY][shapeX])
                     continue;  // ignore void spaces
 
                 const x = topLeftX + shapeX + kHorizontalOffset[direction];
@@ -114,7 +125,7 @@ class Rock {
     settle(grid, { topLeftX, topLeftY }) {
         for (let shapeX = 0; shapeX < this.#size.width; ++shapeX) {
             for (let shapeY = 0; shapeY < this.#size.height; ++shapeY) {
-                if (this.#shape[shapeY][shapeX] !== '#')
+                if (!this.#shape[shapeY][shapeX])
                     continue;  // ignore void spaces
 
                 const x = topLeftX + shapeX;
@@ -152,12 +163,17 @@ class RockGenerator {
 // -------------------------------------------------------------------------------------------------
 
 // parse |pattern.txt|
-let patternInput = null;
+let patternInput = [];
 {
-    patternInput = await fs.readFile('pattern.txt', { encoding: 'utf8' });
-    for (let i = 0; i < patternInput.length; ++i) {
-        if (![ kLeft, kRight ].includes(patternInput[i]))
-            throw new Error(`Invalid pattern at index ${i}: ${patternInput[i]}`);
+    const patternText = await fs.readFile('pattern.txt', { encoding: 'utf8' });
+
+    for (let i = 0; i < patternText.length; ++i) {
+        const pattern = patternText.charCodeAt(i);
+
+        if (![ kLeft, kRight ].includes(pattern))
+            throw new Error(`Invalid pattern at index ${i}: ${patternText[i]}`);
+
+        patternInput.push(pattern);
     }
 }
 
